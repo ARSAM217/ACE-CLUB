@@ -173,6 +173,8 @@ try { db.exec('ALTER TABLE chat_group_members ADD COLUMN notifications_muted INT
 for (const [col,def] of [['type',"TEXT NOT NULL DEFAULT 'text'"],['media_url',"TEXT DEFAULT ''"],['deleted','INTEGER NOT NULL DEFAULT 0'],['pinned','INTEGER NOT NULL DEFAULT 0']]) { try { db.exec(`ALTER TABLE chat_group_messages ADD COLUMN ${col} ${def}`); } catch(e) { if (!String(e.message).includes('duplicate column')) throw e; } }
 const getSetting = k => db.prepare('SELECT value FROM settings WHERE key=?').get(k)?.value ?? defaults[k] ?? '';
 db.exec('CREATE TABLE IF NOT EXISTS fame_like_awards(from_id INTEGER NOT NULL,to_id INTEGER NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(from_id,to_id))');
+db.exec('CREATE TABLE IF NOT EXISTS post_creation_requests(user_id INTEGER NOT NULL,request_id TEXT NOT NULL,post_id INTEGER NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(user_id,request_id))');
+db.exec('CREATE TABLE IF NOT EXISTS post_reward_draws(post_id INTEGER NOT NULL,user_id INTEGER NOT NULL,won INTEGER NOT NULL DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(post_id,user_id))');
 const setSetting = (k,v) => db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(k,String(v));
 setSetting('app_name','ایس کلاب');setSetting('signup_coins','500');
 if(!getSetting('admin_panel_password_hash')){
@@ -368,8 +370,9 @@ function recordPostView(postId, viewerId){
  db.prepare('INSERT OR IGNORE INTO post_views(post_id,viewer_id) VALUES(?,?)').run(p.id,viewerId);
  const after=db.prepare('SELECT COUNT(*) n FROM post_views WHERE post_id=?').get(p.id).n;
  if(after>=Number(p.display_limit||50)){
+  // Views only complete the promotion. Reward results are decided and paid at like time.
+  // Never award a user later from view tracking, because that could contradict the instant win/loss message.
   db.prepare('UPDATE posts SET support_completed=1 WHERE id=?').run(p.id);
-  if(after>before){const post=db.prepare('SELECT reward_enabled,reward_winners FROM posts WHERE id=?').get(p.id);if(post?.reward_enabled){const claimed=db.prepare('SELECT COUNT(*) n FROM post_reward_claims WHERE post_id=?').get(p.id).n;const remaining=Math.max(0,Number(post.reward_winners)-claimed);if(remaining){const candidates=db.prepare('SELECT user_id FROM post_likes WHERE post_id=? AND user_id NOT IN (SELECT user_id FROM post_reward_claims WHERE post_id=?) ORDER BY RANDOM() LIMIT ?').all(p.id,p.id,remaining);for(const candidate of candidates)issuePostReward(p.id,Number(candidate.user_id));}}}
  }
  return after>before;
 }
@@ -379,8 +382,6 @@ function issuePostReward(postId, userId){
  if(db.prepare('SELECT 1 FROM post_reward_claims WHERE post_id=? AND user_id=?').get(p.id,userId))return false;
  const current=db.prepare('SELECT COUNT(*) n FROM post_reward_claims WHERE post_id=?').get(p.id).n;
  if(current>=p.reward_winners)return false;
- const views=db.prepare('SELECT COUNT(*) n FROM post_views WHERE post_id=?').get(p.id).n;
- if(views<p.display_limit)return false;
  const amount=10;
  db.prepare('INSERT OR IGNORE INTO post_reward_claims(post_id,user_id,amount) VALUES(?,?,?)').run(p.id,userId,amount);
  const claim=db.prepare('SELECT id FROM post_reward_claims WHERE post_id=? AND user_id=?').get(p.id,userId);
@@ -414,11 +415,30 @@ app.get('/api/posts/:id',requireAuth,(req,res)=>{
  const comments=db.prepare(`SELECT c.id,c.post_id,c.user_id,c.body,c.created_at,u.username,u.display_name,u.avatar FROM post_comments c JOIN users u ON u.id=c.user_id WHERE c.post_id=? AND c.status='active' ORDER BY c.id ASC LIMIT 300`).all(p.id);
  res.json({post:p,comments,coins:Number(userById(req.user.id)?.coins||0)});
 });
+app.get('/api/posts/:id/adjacent',requireAuth,(req,res)=>{
+ const current=db.prepare("SELECT id,user_id,created_at FROM posts WHERE (id=? OR post_code=?) AND status='active'").get(Number(req.params.id)||-1,String(req.params.id));
+ if(!current)return res.status(404).json({error:'پست پیدا نشد'});
+ const posts=db.prepare("SELECT id,post_code,user_id,created_at FROM posts WHERE status='active' ORDER BY created_at DESC,id DESC LIMIT 500").all();
+ const index=posts.findIndex(x=>Number(x.id)===Number(current.id));
+ res.json({previous:index>0?posts[index-1]:null,next:index>=0&&index<posts.length-1?posts[index+1]:null});
+});
 app.post('/api/posts',requireAuth,postUpload.single('file'),(req,res)=>{
  const body=String(req.body.body||'').trim().slice(0,2000);const f=req.file;
- if(!body&&!f)return res.status(400).json({error:'متن یا فایل عکس/ویدئو انتخاب کن'});
+ const requestId=String(req.body.requestId||'').trim().slice(0,80);
+ const cleanupUpload=()=>{if(f?.path){try{fs.unlinkSync(f.path)}catch{}}};
+ if(!body&&!f){cleanupUpload();return res.status(400).json({error:'متن یا فایل عکس/ویدئو انتخاب کن'});}
+ // Always ensure this table exists before any route query, including older databases
+ // and requests that arrive without an idempotency key. CREATE IF NOT EXISTS is additive.
+ db.exec('CREATE TABLE IF NOT EXISTS post_creation_requests(user_id INTEGER NOT NULL,request_id TEXT NOT NULL,post_id INTEGER NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(user_id,request_id))');
+ if(requestId){
+  const previous=db.prepare('SELECT post_id FROM post_creation_requests WHERE user_id=? AND request_id=?').get(req.user.id,requestId);
+  if(previous){cleanupUpload();const existing=postRow(previous.post_id,req.user.id);if(existing)return res.json({ok:true,duplicate:true,post:existing,url:'https://aceclub.ir/p/'+existing.post_code});}
+ }
+ const todayCount=Number(db.prepare("SELECT COUNT(*) n FROM posts WHERE user_id=? AND created_at>=datetime('now','start of day') AND status<>'deleted'").get(req.user.id)?.n||0);
+ if(todayCount>=10){cleanupUpload();return res.status(429).json({error:'سهمیه امروزت کامل شده؛ روزانه حداکثر ۱۰ پست می‌توانی منتشر کنی.'});}
  const code=String(crypto.randomInt(10000000,99999999));const mediaType=f?(String(f.mimetype).startsWith('video/')?'video':'image'):'';const mediaUrl=f?'/uploads/'+f.filename:'';
  const result=db.prepare('INSERT INTO posts(post_code,user_id,body,media_url,media_type,allow_comments,allow_download) VALUES(?,?,?,?,?,?,?)').run(code,req.user.id,body,mediaUrl,mediaType,([false,0,'0','false'].includes(req.body.allowComments)?0:1),([false,0,'0','false'].includes(req.body.allowDownload)?0:1));
+ if(requestId)db.prepare('INSERT OR IGNORE INTO post_creation_requests(user_id,request_id,post_id) VALUES(?,?,?)').run(req.user.id,requestId,result.lastInsertRowid);
  res.json({ok:true,post:postRow(result.lastInsertRowid,req.user.id),url:'https://aceclub.ir/p/'+code});
 });
 app.post('/api/posts/:id/support',requireAuth,(req,res)=>{
@@ -433,18 +453,66 @@ app.post('/api/posts/:id/support',requireAuth,(req,res)=>{
 });
 app.post('/api/posts/:id/view',requireAuth,(req,res)=>{const id=Number(req.params.id),p=db.prepare("SELECT * FROM posts WHERE id=? AND status='active' AND promoted=1").get(id);if(!p)return res.status(404).json({error:'پست حمایت‌شده پیدا نشد'});recordPostView(id,req.user.id);res.json({ok:true,post:postRow(id,req.user.id),coins:Number(userById(req.user.id)?.coins||0)});});
 app.post('/api/posts/:id/like',requireAuth,(req,res)=>{
- const id=Number(req.params.id);const p=db.prepare("SELECT * FROM posts WHERE id=? AND status='active'").get(id);if(!p)return res.status(404).json({error:'پست پیدا نشد'});if(Number(p.user_id)===req.user.id)return res.status(400).json({error:'نمی‌توانی پست خودت را لایک کنی'});
- if(db.prepare('SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)').get(req.user.id,p.user_id,p.user_id,req.user.id))return res.status(403).json({error:'تعامل با این کاربر ممکن نیست'});
- const existing=db.prepare('SELECT id FROM post_likes WHERE post_id=? AND user_id=?').get(id,req.user.id);let liked;
- if(existing){db.prepare('DELETE FROM post_likes WHERE post_id=? AND user_id=?').run(id,req.user.id);liked=false;}else{
-  db.prepare('INSERT OR IGNORE INTO post_likes(post_id,user_id) VALUES(?,?)').run(id,req.user.id);liked=true;
-  if(p.reward_enabled&&p.promoted){const views=db.prepare('SELECT COUNT(*) n FROM post_views WHERE post_id=?').get(id).n;const claims=db.prepare('SELECT COUNT(*) n FROM post_reward_claims WHERE post_id=?').get(id).n;const remaining=Number(p.reward_winners)-claims;const likeCount=db.prepare('SELECT COUNT(*) n FROM post_likes WHERE post_id=?').get(id).n;if(views>=Number(p.display_limit)&&remaining>0){const remainingCandidates=Math.max(1,Number(p.display_limit)-Math.max(0,likeCount-1));const chance=Math.min(1,remaining/remainingCandidates);if(Math.random()<chance)issuePostReward(id,req.user.id);}
+ const id=Number(req.params.id);
+ // Declare in route scope so every path has a defined reward result.
+ let rewardResult='not_applicable';
+ try {
+  // Additive self-healing for databases created by older releases.
+  db.exec('CREATE TABLE IF NOT EXISTS post_likes(id INTEGER PRIMARY KEY AUTOINCREMENT,post_id INTEGER NOT NULL,user_id INTEGER NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,UNIQUE(post_id,user_id))');
+  db.exec('CREATE TABLE IF NOT EXISTS post_fame_like_awards(post_id INTEGER NOT NULL,from_id INTEGER NOT NULL,to_id INTEGER NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(post_id,from_id))');
+  db.exec('CREATE TABLE IF NOT EXISTS post_reward_claims(id INTEGER PRIMARY KEY AUTOINCREMENT,post_id INTEGER NOT NULL,user_id INTEGER NOT NULL,amount INTEGER NOT NULL,created_at TEXT DEFAULT CURRENT_TIMESTAMP,UNIQUE(post_id,user_id))');
+  db.exec('CREATE TABLE IF NOT EXISTS post_reward_draws(post_id INTEGER NOT NULL,user_id INTEGER NOT NULL,won INTEGER NOT NULL DEFAULT 0,created_at TEXT DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(post_id,user_id))');
+  const p=db.prepare("SELECT * FROM posts WHERE id=? AND status='active'").get(id);
+  if(!p)return res.status(404).json({error:'پست پیدا نشد'});
+  if(Number(p.user_id)===Number(req.user.id))return res.status(400).json({error:'نمی‌توانی پست خودت را لایک کنی'});
+  if(db.prepare('SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)').get(req.user.id,p.user_id,p.user_id,req.user.id))return res.status(403).json({error:'تعامل با این کاربر ممکن نیست'});
+  const existing=db.prepare('SELECT id FROM post_likes WHERE post_id=? AND user_id=?').get(id,req.user.id);
+  if(existing){
+   db.prepare('DELETE FROM post_likes WHERE post_id=? AND user_id=?').run(id,req.user.id);
+   return res.json({ok:true,liked:false,rewardResult:'not_applicable',post:postRow(id,req.user.id),coins:Number(userById(req.user.id)?.coins||0)});
   }
-  const fameAward=db.prepare('INSERT OR IGNORE INTO post_fame_like_awards(post_id,from_id,to_id) VALUES(?,?,?)').run(id,req.user.id,Number(p.user_id));
-  if(fameAward.changes){const owner=userById(Number(p.user_id));if(owner){const current=Math.max(0,Number(owner.fame)||0,Number(owner.xp)||0);syncUserFameAndLevel(Number(p.user_id),{fame:current+500});}}
-  notify(p.user_id,'۵۰۰ شهرت بابت لایک پست','یکی از کاربران پستت را لایک کرد؛ ۵۰۰ شهرت به حسابت اضافه شد.',{action:'post_like',requestId:id});
+  db.prepare('INSERT OR IGNORE INTO post_likes(post_id,user_id) VALUES(?,?)').run(id,req.user.id);
+  // Fame is independent from the reward draw. A reward failure must never cancel a like or fame award.
+  let fameAwarded=false;
+  let fameAwardRowInserted=false;
+  try {
+   const award=db.prepare('INSERT OR IGNORE INTO post_fame_like_awards(post_id,from_id,to_id) VALUES(?,?,?)').run(id,req.user.id,Number(p.user_id));
+   fameAwardRowInserted=Number(award.changes)>0;
+   if(fameAwardRowInserted){
+    const owner=userById(Number(p.user_id));
+    if(!owner)throw new Error('Post owner account not found');
+    const current=Math.max(0,Number(owner.fame)||0,Number(owner.xp)||0);
+    syncUserFameAndLevel(Number(p.user_id),{fame:current+500});
+    fameAwarded=true;
+   }
+  } catch(fameErr) {
+   // Do not leave a permanent award marker if the balance update failed; a later retry can repair it.
+   if(fameAwardRowInserted){try{db.prepare('DELETE FROM post_fame_like_awards WHERE post_id=? AND from_id=?').run(id,req.user.id);}catch(rollbackErr){console.error('Post like fame marker rollback failed:',rollbackErr);}}
+   console.error('Post like fame award failed:',fameErr);
+  }
+  if(fameAwarded){try{notify(p.user_id,'۵۰۰ شهرت بابت لایک پست','یکی از کاربران پستت را لایک کرد؛ ۵۰۰ شهرت به حسابت اضافه شد.',{action:'post_like',requestId:id});}catch(notifyErr){console.error('Post like fame notification failed:',notifyErr);}}
+  rewardResult='not_applicable';
+  if(Number(p.reward_enabled)===1&&Number(p.promoted)===1){
+   try {
+    const priorDraw=db.prepare('SELECT won FROM post_reward_draws WHERE post_id=? AND user_id=?').get(id,req.user.id);
+    if(priorDraw){rewardResult=Number(priorDraw.won)?'won':'lost';}
+    else {
+     const claims=Number(db.prepare('SELECT COUNT(*) n FROM post_reward_claims WHERE post_id=?').get(id).n||0);
+     const draws=Number(db.prepare('SELECT COUNT(*) n FROM post_reward_draws WHERE post_id=?').get(id).n||0);
+     const remaining=Math.max(0,Number(p.reward_winners)-claims);
+     const opportunities=Math.max(1,Number(p.display_limit||50)-draws);
+     const chance=remaining>0?Math.min(1,remaining/opportunities):0;
+     const won=remaining>0&&Math.random()<chance;
+     db.prepare('INSERT OR IGNORE INTO post_reward_draws(post_id,user_id,won) VALUES(?,?,?)').run(id,req.user.id,won?1:0);
+     rewardResult=won&&issuePostReward(id,req.user.id)?'won':'lost';
+    }
+   } catch(rewardErr) { console.error('Post like reward draw failed:',rewardErr); rewardResult='unavailable'; }
+  }
+  res.json({ok:true,liked:true,rewardResult,post:postRow(id,req.user.id),coins:Number(userById(req.user.id)?.coins||0)});
+ } catch(err) {
+  console.error('Post like request failed:',err);
+  return res.status(500).json({error:'ثبت لایک انجام نشد؛ لطفاً دوباره تلاش کن'});
  }
- res.json({ok:true,liked,post:postRow(id,req.user.id),coins:Number(userById(req.user.id)?.coins||0)});
 });
 app.post('/api/posts/:id/comments',requireAuth,(req,res)=>{
  const id=Number(req.params.id),body=String(req.body.body||'').trim().slice(0,1000);const p=db.prepare("SELECT * FROM posts WHERE id=? AND status='active'").get(id);if(!p)return res.status(404).json({error:'پست پیدا نشد'});if(!p.allow_comments)return res.status(403).json({error:'نظر دادن برای این پست غیرفعال است'});if(!body)return res.status(400).json({error:'متن نظر را بنویس'});if(Number(p.user_id)!==req.user.id&&db.prepare('SELECT 1 FROM blocks WHERE (user_id=? AND blocked_id=?) OR (user_id=? AND blocked_id=?)').get(req.user.id,p.user_id,p.user_id,req.user.id))return res.status(403).json({error:'امکان نظر دادن وجود ندارد'});

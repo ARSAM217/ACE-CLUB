@@ -492,3 +492,28 @@ body{background-color:var(--bg);background-repeat:no-repeat;background-size:cove
 .profile-top-actions .ace-action-icon{width:44px;height:44px}
 .chat-list-row{gap:8px}
 @media(max-width:380px){.ace-wallet-pill{gap:5px;padding:7px 8px!important;font-size:10px}.ace-action-icon{width:38px;height:38px;flex-basis:38px}}
+
+
+/* V10 targeted fixes: compact private-chat action icons without disabling actions */
+.chat-list-row .ace-action-icon{
+  width:30px!important;
+  height:30px!important;
+  min-width:30px!important;
+  min-height:30px!important;
+  padding:5px!important;
+  border-radius:10px!important;
+}
+.chat-list-row .ace-action-icon img{
+  width:16px!important;
+  height:16px!important;
+}
+.chat-list-row{gap:6px}
+
+/* Targeted ACE CLUB fixes: compact chat controls and post navigation. */
+.chat-head .ace-action-icon{width:32px;height:32px;flex-basis:32px;padding:5px;border-radius:10px}
+.chat-head .ace-action-icon img{width:18px;height:18px}
+.chat-action-sheet [data-message-delete]{font-size:13px;padding:10px 12px}
+.ace-detail-comment-count{border:0;background:transparent;color:#aebcff;font:inherit;font-size:11px;padding:0;text-decoration:underline;text-underline-offset:3px}
+.ace-post-adjacent{display:flex;gap:10px;margin:14px 0 28px}
+.ace-post-adjacent button{flex:1;min-height:40px;border:1px solid #5142c8;border-radius:12px;background:#111638;color:#e7e9ff;font:inherit;font-size:12px}
+.ace-post-adjacent button:disabled{opacity:.35}
