@@ -106,7 +106,27 @@
     return `<section class="classic-game-page"><header class="classic-game-top"><div class="classic-top-actions"><button class="classic-top-btn" data-classic-guide>${icon('game-guide')}<span>راهنما</span></button><button class="classic-top-btn" data-classic-settings>${icon('game-settings')}<span>تنظیمات</span><small>آپدیت به‌زودی</small></button></div><div><div class="classic-turn-title ${turn?'your-turn':''}">${turn?'نوبت تو':'نوبت حریف'}<span class="classic-timer">${fa(secs)}</span></div><button class="classic-report-link" data-classic-report>${icon('game-report')} گزارش بازی</button></div></header><div class="classic-board-wrap">${boardHtml(room,wallMode)}</div><div class="classic-instruction">${turn?(wallMode?'برای گذاشتن دیوار، جای روشن را لمس کن.':'مهره را حرکت بده یا حالت دیوار را انتخاب کن.'):'صبر کن تا نوبت حریف تمام شود.'}</div><div class="classic-actions"><button class="classic-wall-choice ${wallMode&&window.classicWallOrientation==='v'?'active':''}" data-classic-wall-mode data-orientation="v" ${!turn||meWalls<=0?'disabled':''}>${icon('game-wall-v')}<span>دیوار عمودی</span><small>${fa(meWalls)} دیوار</small></button><button class="classic-wall-choice ${wallMode&&window.classicWallOrientation==='h'?'active':''}" data-classic-wall-mode data-orientation="h" ${!turn||meWalls<=0?'disabled':''}>${icon('game-wall-h')}<span>دیوار افقی</span><small>${fa(meWalls)} دیوار</small></button><button class="classic-wall-choice ${!wallMode?'active':''}" data-classic-move-mode ${!turn?'disabled':''}>${icon('game-classic')}<span>حرکت مهره</span><small>${turn?'انتخاب حرکت':'نوبت حریف'}</small></button></div><div class="classic-chat-card"><div class="classic-quick"><button data-classic-quick="موفق باشی! 🍀">موفق باشی! 🍀</button><button data-classic-quick="حرکت خوبی بود 🔥">حرکت خوبی بود 🔥</button><button data-classic-quick="زودتر بازی کن ⏳">زودتر بازی کن ⏳</button></div><div id="classicChatMessages"></div><form id="classicChatForm"><textarea id="classicChatInput" maxlength="300" rows="1" enterkeyhint="send" autocomplete="off" autocorrect="on" spellcheck="true" placeholder="پیامت رو بنویس..."></textarea><button type="submit">➤</button></form></div><button class="classic-leave-btn" data-classic-leave>خروج از بازی</button></section>`;
   }
   async function renderClassicRoot(room){
-    const root=$('#classicRoot');if(!root)return;root.innerHTML=classicRoomMarkup(room);if(room.status==='waiting')return;
+    const root=$('#classicRoot');if(!root)return;root.innerHTML=classicRoomMarkup(room);
+    // Waiting rooms return before the gameplay handlers are installed, so bind the
+    // leave action explicitly here. This fixes the inert "خروج از اتاق انتظار" button.
+    if(room.status==='waiting'){
+      root.onclick=async e=>{
+        const leave=e.target.closest('[data-classic-leave-wait]');
+        if(!leave)return;
+        if(leave.disabled)return;
+        leave.disabled=true;leave.textContent='در حال خروج…';
+        try{
+          const out=await api(`/games/room/${room.id}/leave`,{method:'POST',body:{}});
+          clearTimers();window.activeGameRoom=null;document.body.classList.remove('classic-game-mode');view='games';
+          toast(out.message||'از اتاق انتظار خارج شدی');
+          await gamesScreen();
+        }catch(err){
+          toast(err.message||'خروج از اتاق انتظار انجام نشد');
+          leave.disabled=false;leave.textContent='خروج از اتاق انتظار';
+        }
+      };
+      return;
+    }
     const mine=room.players.find(p=>Number(p.user_id)===Number(me.id));if(!mine)return;
     $('#classicRoot').onclick=async e=>{
       const g=e.target.closest('[data-classic-guide]');if(g){gameGuide();return}
