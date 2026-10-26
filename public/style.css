@@ -634,3 +634,5 @@ body{background-color:var(--bg);background-repeat:no-repeat;background-size:cove
 .restriction-user .row .field{min-width:0}
 .edit-profile-avatar .avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .ace-level-mini small{display:block;font-size:.76rem;opacity:.88;margin-top:4px}
+
+.classic-advanced-wait-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px;border-radius:20px;background:#0e1626;border:1px solid #ffffff12}.classic-advanced-wait-slots .classic-player-slot{padding:12px 6px;border-radius:15px;background:#ffffff05;min-width:0}.classic-advanced-wait-slots .classic-player-slot b{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.classic-advanced-wait-slots .classic-player-slot .avatar{width:54px;height:54px}

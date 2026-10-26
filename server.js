@@ -600,6 +600,8 @@ app.post('/api/auth/register', (req,res)=>{
  if(invite_code){const inviter=userByName(invite_code);if(inviter&&inviter.id!==uid){const referral=db.prepare('INSERT OR IGNORE INTO referrals(inviter_id,invitee_id) VALUES(?,?)').run(inviter.id,uid);if(referral.changes){addTx(inviter.id,500,'referral','پاداش دعوت دوست '+username);addTx(uid,250,'referral_welcome','پاداش خوش‌آمدگویی از دعوت '+inviter.username);notify(inviter.id,'پاداش دعوت','۵۰۰ سکه به‌خاطر دعوت دوستت به حسابت اضافه شد.');notify(uid,'پاداش دعوت','۲۵۰ سکه به‌خاطر دعوت شدن به ایس کلاب دریافت کردی.');}}}
  recordLoginDay(uid);req.session.uid=uid;res.json({user:safeUser(userById(uid))});
 });
+app.get('/api/auth/device-accounts',(req,res)=>{const did=String(req.get('X-ACE-Device-ID')||'').trim().slice(0,100);if(!did||!/^[A-Za-z0-9._:-]+$/.test(did))return res.json({accounts:[]});const accounts=db.prepare("SELECT id,username,display_name,avatar FROM users WHERE device_id=? AND is_banned=0 ORDER BY last_seen DESC,id DESC LIMIT 10").all(did);res.json({accounts});});
+app.post('/api/auth/device-login',(req,res)=>{const did=String(req.get('X-ACE-Device-ID')||'').trim().slice(0,100),id=Number(req.body.userId);if(!did||!/^[A-Za-z0-9._:-]+$/.test(did))return res.status(400).json({error:'شناسهٔ دستگاه معتبر نیست'});const u=db.prepare('SELECT * FROM users WHERE id=? AND device_id=?').get(id,did);if(!u)return res.status(403).json({error:'این حساب به شناسهٔ همین دستگاه متصل نیست'});if(u.is_banned)return res.status(403).json({error:'این حساب مسدود است'});req.session.uid=u.id;db.prepare('UPDATE users SET last_seen=CURRENT_TIMESTAMP WHERE id=?').run(u.id);recordLoginDay(u.id);logActivity(u.id,u.id,'device_quick_login','ورود سریع از فهرست حساب‌های همین دستگاه');res.json({user:safeUser(userById(u.id))});});
 app.post('/api/auth/login',(req,res)=>{const {username,password}=req.body||{};const u=userByName(String(username||''));if(!u||!bcrypt.compareSync(String(password||''),u.password_hash))return res.status(400).json({error:'نام کاربری یا رمز عبور اشتباه است'});if(u.is_banned && u.ban_until && Date.parse(u.ban_until)<=Date.now()){db.prepare('UPDATE users SET is_banned=0,ban_reason=NULL,ban_until=NULL WHERE id=?').run(u.id);u=userById(u.id);}if(u.is_banned)return res.status(403).json({error:u.ban_reason?`حساب شما مسدود شده است: ${u.ban_reason}`:'حساب شما مسدود شده است'});req.session.uid=u.id;db.prepare('UPDATE users SET last_seen=CURRENT_TIMESTAMP WHERE id=?').run(u.id);recordLoginDay(u.id);logActivity(u.id,u.id,'login','ورود به حساب');res.json({user:safeUser(userById(u.id))});});
 app.post('/api/auth/logout',requireAuth,(req,res)=>{if(!String(req.user.phone||'').trim())return res.status(400).json({error:'برای خروج از حساب، ابتدا شماره تلفن خود را در بخش امنیت ثبت کنید'});req.session.destroy(err=>{if(err)return res.status(500).json({error:'خروج از حساب انجام نشد'});res.clearCookie('dor.sid',{httpOnly:true,sameSite:'lax',secure:process.env.NODE_ENV==='production'});res.json({ok:true});});});
 app.get('/api/security/status',requireAuth,(req,res)=>res.json({hasPhone:!!req.user.phone,maskedPhone:req.user.phone?String(req.user.phone).replace(/.(?=.{4})/g,'•'):''}));
@@ -1115,12 +1117,12 @@ io.on('connection',socket=>{
  socket.on('disconnect',()=>{anonQueue.delete(socket.userId);leaveAnonymous(socket.userId,'اتصال شما قطع شد');});
 });
 // Multiplayer mini-games: server-authoritative rooms, ratings and rewards.
-const GAME_RULES={classic:{min:2,max:2,target:8},snakes:{min:2,max:5,target:100},rps:{min:2,max:2,target:1},connect4:{min:2,max:2,target:4},drawguess:{min:2,max:8,target:1}};
+const GAME_RULES={classic:{min:2,max:2,target:8},advanced:{min:4,max:4,target:11},snakes:{min:2,max:5,target:100},rps:{min:2,max:2,target:1},connect4:{min:2,max:2,target:4},drawguess:{min:2,max:8,target:1}};
 const gameRoomState = (roomId,userId=null) => {
  const room=db.prepare('SELECT * FROM game_rooms WHERE id=?').get(Number(roomId));
  if(!room)return null;
  const players=db.prepare('SELECT gp.user_id,gp.position,gp.choice,gp.roll,u.username,u.display_name,u.avatar,u.level FROM game_players gp JOIN users u ON u.id=gp.user_id WHERE gp.room_id=? ORDER BY gp.joined_at,gp.user_id').all(room.id);
- const safeState=JSON.parse(room.state_json||'{}');if(room.game_type==='drawguess'&&Number(safeState.drawer)!==Number(userId))safeState.word=null;const mappedPlayers=players.map(p=>({user_id:p.user_id,position:room.game_type==='classic'?(safeState.players?.[String(p.user_id)]?.position||{r:0,c:4}):p.position,walls:room.game_type==='classic'?(safeState.players?.[String(p.user_id)]?.walls??10):undefined,goal:room.game_type==='classic'?(safeState.players?.[String(p.user_id)]?.goal||'bottom'):undefined,roll:p.roll,username:p.username,display_name:p.display_name,avatar:p.avatar,level:p.level}));return {id:room.id,gameCode:room.game_code||('GAME-'+String(room.id).padStart(8,'0')),roomCode:room.room_code||null,gameType:room.game_type,status:room.status,createdAt:room.created_at,startedAt:room.started_at,deadline:room.deadline,winnerId:room.winner_id,createdBy:room.created_by,isPrivate:!!room.room_code,state:safeState,players:mappedPlayers};
+ const safeState=JSON.parse(room.state_json||'{}');if(room.game_type==='drawguess'&&Number(safeState.drawer)!==Number(userId))safeState.word=null;const mappedPlayers=players.map(p=>({user_id:p.user_id,position:['classic','advanced'].includes(room.game_type)?(safeState.players?.[String(p.user_id)]?.position||{r:0,c:4}):p.position,walls:['classic','advanced'].includes(room.game_type)?(safeState.players?.[String(p.user_id)]?.walls??(room.game_type==='advanced'?5:10)):undefined,goal:['classic','advanced'].includes(room.game_type)?(safeState.players?.[String(p.user_id)]?.goal||'bottom'):undefined,team: safeState.players?.[String(p.user_id)]?.team, color: safeState.players?.[String(p.user_id)]?.color, roll:p.roll,username:p.username,display_name:p.display_name,avatar:p.avatar,level:p.level}));return {id:room.id,gameCode:room.game_code||('GAME-'+String(room.id).padStart(8,'0')),roomCode:room.room_code||null,gameType:room.game_type,status:room.status,createdAt:room.created_at,startedAt:room.started_at,deadline:room.deadline,winnerId:room.winner_id,createdBy:room.created_by,isPrivate:!!room.room_code,state:safeState,players:mappedPlayers};
 };
 function fameRequiredForLevel(level){
  const target=Math.max(1,Math.min(1000,Math.floor(Number(level)||1)));
@@ -1177,6 +1179,10 @@ function finishGame(roomId,winnerId){
  const room=db.prepare('SELECT * FROM game_rooms WHERE id=?').get(roomId); if(!room||room.status==='finished')return;
  const players=db.prepare('SELECT user_id FROM game_players WHERE room_id=?').all(roomId);
  db.prepare("UPDATE game_rooms SET status='finished',finished_at=CURRENT_TIMESTAMP,winner_id=? WHERE id=?").run(winnerId||null,roomId);
+ if(room.game_type==='advanced'&&!room.room_code){
+  const st=JSON.parse(room.state_json||'{}'),winningTeam=st.players?.[String(winnerId)]?.team;
+  for(const p of players){const pp=st.players?.[String(p.user_id)],win=!!winnerId&&Number(pp?.team)===Number(winningTeam);db.prepare('INSERT INTO game_results(room_id,game_type,user_id,result,fame_delta) VALUES(?,?,?,?,?)').run(roomId,room.game_type,p.user_id,win?'win':'loss',win?500:0);if(win){const u=userById(p.user_id);syncUserFameAndLevel(p.user_id,{fame:Math.max(0,Number(u?.fame||0),Number(u?.xp||0))+500});db.prepare('UPDATE users SET diamonds=diamonds+5 WHERE id=?').run(p.user_id);db.prepare('INSERT INTO transactions(user_id,amount,kind,note) VALUES(?,?,?,?)').run(p.user_id,5,'advanced_game_win_diamonds','جایزه برد بازی پیشرفته تیمی');recalcGameLevel(p.user_id);notify(p.user_id,'پیروزی در بازی پیشرفته','تیمت برنده شد؛ ۵ الماس و ۵۰۰ شهرت گرفتی.');}else notify(p.user_id,'نتیجه بازی پیشرفته','تیمت این بازی را واگذار کرد.');}return;
+ }
  if(room.game_type==='classic'&&!room.room_code){
    for(const p of players){const win=Number(winnerId)===Number(p.user_id);db.prepare('INSERT INTO game_results(room_id,game_type,user_id,result,fame_delta) VALUES(?,?,?,?,?)').run(roomId,room.game_type,p.user_id,win?'win':'loss',win?500:0);if(win){syncUserFameAndLevel(p.user_id,{fame:Math.max(0,Number(userById(p.user_id)?.fame||0),Number(userById(p.user_id)?.xp||0))+500});db.prepare('UPDATE users SET diamonds=diamonds+5 WHERE id=?').run(p.user_id);db.prepare('INSERT INTO transactions(user_id,amount,kind,note) VALUES(?,?,?,?)').run(p.user_id,5,'classic_game_win_diamonds','جایزه برد بازی کلاسیک');recalcGameLevel(p.user_id);notify(p.user_id,'پیروزی در بازی کلاسیک','۵ الماس و ۵۰۰ شهرت به حسابت اضافه شد.');}else notify(p.user_id,'نتیجه بازی کلاسیک','این بازی را به حریف واگذار کردی.');}return;
  }
@@ -1184,12 +1190,29 @@ function finishGame(roomId,winnerId){
  const winDelta=Math.max(1,Number(getSetting('game_win_fame'))||250), lossDelta=Math.max(1,Number(getSetting('game_loss_fame'))||30);
  for(const p of players){const win=winnerId&&p.user_id===winnerId;const delta=win?winDelta:-lossDelta;db.prepare('INSERT INTO game_results(room_id,game_type,user_id,result,fame_delta) VALUES(?,?,?,?,?)').run(roomId,room.game_type,p.user_id,win?'win':winnerId?'loss':'draw',winnerId?delta:0);if(winnerId){syncUserFameAndLevel(p.user_id,{fame:Math.max(0,Number(userById(p.user_id)?.fame||0),Number(userById(p.user_id)?.xp||0))+delta});recalcGameLevel(p.user_id);notify(p.user_id,win?'پیروزی در بازی':'نتیجه بازی',win?`برنده شدی؛ ${delta} شهرت گرفتی.`:`باختی؛ ${Math.abs(delta)} شهرت کم شد.`);}}
 }
-function startGameIfReady(roomId,force=false){const room=db.prepare('SELECT * FROM game_rooms WHERE id=?').get(roomId);if(!room||room.status!=='waiting')return room;const rules=GAME_RULES[room.game_type],count=db.prepare('SELECT COUNT(*) n FROM game_players WHERE room_id=?').get(roomId).n;if(room.room_code ? (force&&count>=rules.min) : count>=rules.min){db.prepare("UPDATE game_rooms SET status='playing',started_at=CURRENT_TIMESTAMP WHERE id=?").run(roomId);const ps=db.prepare('SELECT user_id FROM game_players WHERE room_id=? ORDER BY joined_at,user_id').all(roomId);const classicPlayers=room.game_type==='classic'?Object.fromEntries(ps.map((p,i)=>[String(p.user_id),{position:{r:i===0?8:0,c:4},walls:10,goal:i===0?'top':'bottom'}])):{};db.prepare('UPDATE game_rooms SET state_json=? WHERE id=?').run(JSON.stringify({turn:ps[0]?.user_id||null,round:1,turnStartedAt:Date.now(),missedTurns:{},board:room.game_type==='classic'?{}:room.game_type==='snakes'?{snakes:{16:6,47:26,49:11,56:53,62:19,64:60,87:24,93:73,95:75,98:78},ladders:{1:38,4:14,9:31,21:42,28:84,36:44,51:67,71:91,80:100}}:room.game_type==='connect4'?Array.from({length:6},()=>Array(7).fill(0)): {},walls:[],players:classicPlayers, word:room.game_type==='drawguess'?['سیب','گربه','دوچرخه','خورشید','خانه','ماهی','درخت','هواپیما'][Math.floor(Math.random()*8)]:null,drawer:room.game_type==='drawguess'?ps[0]?.user_id:null,strokes:[],guesses:[],activityAt:room.game_type==='drawguess'?Object.fromEntries(ps.map(p=>[p.user_id,Date.now()])):{},scores:room.game_type==='drawguess'?Object.fromEntries(ps.map(p=>[p.user_id,0])):{},matchEndsAt:room.game_type==='drawguess'?Date.now()+180000:null,roundEndsAt:room.game_type==='drawguess'?Date.now()+80000:null}),roomId);if(room.game_type==='classic'){for(const p of ps)notify(p.user_id,'بازی شروع شد','حریف پیدا شد؛ ورود به بازی', {action:'game_start',requestId:roomId});}return db.prepare('SELECT * FROM game_rooms WHERE id=?').get(roomId);}return room;}
+function startGameIfReady(roomId,force=false){
+ const room=db.prepare('SELECT * FROM game_rooms WHERE id=?').get(roomId);if(!room||room.status!=='waiting')return room;
+ const rules=GAME_RULES[room.game_type],count=db.prepare('SELECT COUNT(*) n FROM game_players WHERE room_id=?').get(roomId).n;
+ if(!(room.room_code?(force&&count>=rules.min):count>=rules.min))return room;
+ const ps=db.prepare('SELECT user_id FROM game_players WHERE room_id=? ORDER BY joined_at,user_id').all(roomId);
+ let gamePlayers={};
+ if(room.game_type==='classic')gamePlayers=Object.fromEntries(ps.map((p,i)=>[String(p.user_id),{position:{r:i===0?8:0,c:4},walls:10,goal:i===0?'top':'bottom'}]));
+ if(room.game_type==='advanced'){
+  const colors=['red','blue','green','yellow'];
+  const shuffled=ps.map(p=>p.user_id).sort(()=>Math.random()-.5);const teams=[0,0,1,1];
+  const assigned=shuffled.map((uid,i)=>({uid,team:teams[i],color:colors[i]}));
+  gamePlayers=Object.fromEntries(assigned.map((p,i)=>[String(p.uid),{position:{r:p.team===0?11:0,c:i%2===0?4:7},walls:5,goal:p.team===0?'top':'bottom',team:p.team,color:p.color}]));
+ }
+ const initial={turn:ps[0]?.user_id||null,round:1,roundWins:{0:0,1:0},turnStartedAt:Date.now(),missedTurns:{},board:room.game_type==='classic'||room.game_type==='advanced'?{}:room.game_type==='snakes'?{snakes:{16:6,47:26,49:11,56:53,62:19,64:60,87:24,93:73,95:75,98:78},ladders:{1:38,4:14,9:31,21:42,28:84,36:44,51:67,71:91,80:100}}:room.game_type==='connect4'?Array.from({length:6},()=>Array(7).fill(0)): {},walls:[],players:gamePlayers,word:room.game_type==='drawguess'?['سیب','گربه','دوچرخه','خورشید','خانه','ماهی','درخت','هواپیما'][Math.floor(Math.random()*8)]:null,drawer:room.game_type==='drawguess'?ps[0]?.user_id:null,strokes:[],guesses:[],activityAt:room.game_type==='drawguess'?Object.fromEntries(ps.map(p=>[p.user_id,Date.now()])):{},scores:room.game_type==='drawguess'?Object.fromEntries(ps.map(p=>[p.user_id,0])):{},matchEndsAt:room.game_type==='drawguess'?Date.now()+180000:null,roundEndsAt:room.game_type==='drawguess'?Date.now()+80000:null};
+ db.prepare("UPDATE game_rooms SET status='playing',started_at=CURRENT_TIMESTAMP WHERE id=?").run(roomId);db.prepare('UPDATE game_rooms SET state_json=? WHERE id=?').run(JSON.stringify(initial),roomId);
+ if(['classic','advanced'].includes(room.game_type))for(const p of ps)notify(p.user_id,'بازی شروع شد','بازیکنان آماده‌اند؛ ورود به بازی',{action:'game_start',requestId:roomId});
+ return db.prepare('SELECT * FROM game_rooms WHERE id=?').get(roomId);
+}
 app.post('/api/games/join',requireAuth,requireGameAccess,(req,res)=>{
  const type=String(req.body.gameType||'');if(type==='drawguess')return res.status(410).json({error:'بازی نقاشی و حدس در به‌روزرسانی بعدی فعال می‌شود'});const rules=GAME_RULES[type];if(!rules)return res.status(400).json({error:'بازی معتبر نیست'});
  const existing=db.prepare("SELECT r.* FROM game_rooms r JOIN game_players p ON p.room_id=r.id WHERE p.user_id=? AND r.status IN ('waiting','playing') ORDER BY r.id DESC LIMIT 1").get(req.user.id);if(existing){if(existing.game_type!==type)return res.status(409).json({error:'ابتدا از بازی فعلی خارج شو، سپس بازی دیگری انتخاب کن'});return res.json({room:gameRoomState(existing.id,req.user.id)});}
  let room=db.prepare("SELECT * FROM game_rooms WHERE game_type=? AND status='waiting' AND room_code IS NULL ORDER BY id ASC LIMIT 1").get(type);
- if(!room){const deadline=Date.now()+180000;const r=db.prepare("INSERT INTO game_rooms(game_type,status,created_by,deadline,state_json) VALUES(?,'waiting',?,?, '{}')").run(type,req.user.id,deadline);db.prepare("UPDATE game_rooms SET game_code=? WHERE id=?").run('GAME-'+String(r.lastInsertRowid).padStart(8,'0'),r.lastInsertRowid);room=db.prepare('SELECT * FROM game_rooms WHERE id=?').get(r.lastInsertRowid);}
+ if(!room){const deadline=Date.now()+60000;const r=db.prepare("INSERT INTO game_rooms(game_type,status,created_by,deadline,state_json) VALUES(?,'waiting',?,?, '{}')").run(type,req.user.id,deadline);db.prepare("UPDATE game_rooms SET game_code=? WHERE id=?").run('GAME-'+String(r.lastInsertRowid).padStart(8,'0'),r.lastInsertRowid);room=db.prepare('SELECT * FROM game_rooms WHERE id=?').get(r.lastInsertRowid);}
  const count=db.prepare('SELECT COUNT(*) n FROM game_players WHERE room_id=?').get(room.id).n;if(count>=rules.max)return res.status(409).json({error:'این لابی پر شده است؛ دوباره تلاش کن'});
  db.prepare('INSERT OR IGNORE INTO game_players(room_id,user_id,position) VALUES(?,?,0)').run(room.id,req.user.id);
  room=startGameIfReady(room.id,false)||room;
@@ -1216,9 +1239,9 @@ function processGameTurnTimeout(roomId){
  const players=db.prepare('SELECT user_id,choice FROM game_players WHERE room_id=? ORDER BY joined_at,user_id').all(room.id);
  if(!players.length)return;
  const now=Date.now(),misses=state.missedTurns||{};
- if(room.game_type==='classic'){
+ if(['classic','advanced'].includes(room.game_type)){
   if(!state.turnStartedAt||now-Number(state.turnStartedAt)<15000)return;
-  const current=Number(state.turn),next=players.find(p=>Number(p.user_id)!==current)?.user_id;
+  const current=Number(state.turn),ix=players.findIndex(p=>Number(p.user_id)===current),next=players[(ix+1)%players.length]?.user_id;
   if(!next)return;
   state.turn=next;state.turnStartedAt=now;state.lastTimeout={userId:current};db.prepare('UPDATE game_rooms SET state_json=? WHERE id=?').run(JSON.stringify(state),room.id);
   notify(current,'مهلت حرکت تمام شد','حرکتی انجام ندادی؛ نوبت به حریف رسید.');notify(next,'نوبت تو شد','نوبت توست؛ ۱۵ ثانیه فرصت داری.');return;
@@ -1268,6 +1291,41 @@ app.post('/api/games/room/:id/action',requireAuth,requireGameAccess,(req,res)=>{
  const roomId=Number(req.params.id);let room=db.prepare('SELECT * FROM game_rooms WHERE id=?').get(roomId);if(!room)return res.status(404).json({error:'لابی پیدا نشد'});if(!db.prepare('SELECT 1 FROM game_players WHERE room_id=? AND user_id=?').get(roomId,req.user.id))return res.status(403).json({error:'عضو این بازی نیستی'});
  if(room.status==='waiting'&&Date.now()>=Number(room.deadline))room=startGameIfReady(roomId,true)||room;if(room.status!=='playing')return res.status(409).json({error:'بازی هنوز شروع نشده؛ منتظر بازیکنان بمان'});
  const rules=GAME_RULES[room.game_type],state=JSON.parse(room.state_json||'{}');const players=db.prepare('SELECT * FROM game_players WHERE room_id=? ORDER BY joined_at,user_id').all(roomId);if(!players.length)return res.status(409).json({error:'بازیکنی در بازی نیست'});
+ if(room.game_type==='advanced'){
+  if(Number(state.turn)!==req.user.id)return res.status(409).json({error:'هنوز نوبت تو نیست'});
+  const cp=state.players?.[String(req.user.id)];if(!cp)return res.status(409).json({error:'وضعیت بازیکن پیدا نشد'});
+  const ordered=players.map(p=>p.user_id),walls=Array.isArray(state.walls)?state.walls:[],N=12;
+  const blocked=(r1,c1,r2,c2,ws=walls)=>{const dr=r2-r1,dc=c2-c1,h=(r,c)=>ws.some(x=>x.o==='h'&&+x.r===r&&+x.c===c),v=(r,c)=>ws.some(x=>x.o==='v'&&+x.r===r&&+x.c===c);if(dr===-1)return h(r2,c2)||h(r2,c2-1);if(dr===1)return h(r1,c1)||h(r1,c1-1);if(dc===-1)return v(r2,c2)||v(r2-1,c2);if(dc===1)return v(r1,c1)||v(r1-1,c1);return true;};
+  const occupied=(r,c)=>Object.entries(state.players||{}).find(([uid,x])=>uid!==String(req.user.id)&&+x.position.r===r&&+x.position.c===c);
+  const action=String(req.body.action||'');
+  if(action==='move'){
+   const nr=Number(req.body.row),nc=Number(req.body.col),r=+cp.position.r,c=+cp.position.c;
+   if(!Number.isInteger(nr)||!Number.isInteger(nc)||nr<0||nr>=N||nc<0||nc>=N)return res.status(400).json({error:'خانه نامعتبر است'});
+   const dr=nr-r,dc=nc-c;let legal=false;
+   if(Math.abs(dr)+Math.abs(dc)===1&&!blocked(r,c,nr,nc)&&!occupied(nr,nc))legal=true;
+   // In advanced mode a player may jump over a teammate, but never over an opponent.
+   if(!legal&&Math.abs(dr)+Math.abs(dc)===2&&(dr===0||dc===0)){
+    const mr=r+Math.sign(dr),mc=c+Math.sign(dc),mid=occupied(mr,mc);
+    if(mid&&Number(state.players[mid[0]].team)===Number(cp.team)&&!blocked(r,c,mr,mc)&&!blocked(mr,mc,nr,nc)&&!occupied(nr,nc))legal=true;
+   }
+   if(!legal)return res.status(409).json({error:'این حرکت مجاز نیست؛ از روی حریف نمی‌توانی بپری'});
+   cp.position={r:nr,c:nc};
+   const goalReached=cp.goal==='top'?nr===0:nr===N-1;
+   if(goalReached){const team=Number(cp.team);state.roundWins=state.roundWins||{0:0,1:0};state.roundWins[team]=(Number(state.roundWins[team])||0)+1;
+    if(state.roundWins[team]>=3){db.prepare('UPDATE game_rooms SET state_json=? WHERE id=?').run(JSON.stringify(state),roomId);finishGame(roomId,Number(req.user.id));return res.json({room:gameRoomState(roomId,req.user.id)});}
+    state.round=Number(state.round||1)+1;state.walls=[];const ps=players.map(p=>p.user_id).sort(()=>Math.random()-.5);Object.entries(state.players).forEach(([uid,x],i)=>{x.position={r:x.team===0?11:0,c:i%2===0?4:7};x.walls=5;});state.turn=ps[0];state.turnStartedAt=Date.now();db.prepare('UPDATE game_rooms SET state_json=? WHERE id=?').run(JSON.stringify(state),roomId);return res.json({room:gameRoomState(roomId,req.user.id)});
+   }
+   const ix=ordered.indexOf(req.user.id);state.turn=ordered[(ix+1)%ordered.length];state.turnStartedAt=Date.now();
+  }else if(action==='wall'){
+   if(Number(cp.walls)<=0)return res.status(409).json({error:'دیوار باقی نمانده است'});const o=String(req.body.orientation||''),r=Number(req.body.row),c=Number(req.body.col);
+   if(!['h','v'].includes(o)||!Number.isInteger(r)||!Number.isInteger(c)||r<0||r>N-2||c<0||c>N-2)return res.status(400).json({error:'جای دیوار نامعتبر است'});
+   if(walls.some(x=>x.o===o&&+x.r===r&&+x.c===c)||(o==='h'&&(walls.some(x=>x.o==='h'&&+x.r===r&&Math.abs(+x.c-c)===1)||walls.some(x=>x.o==='v'&&+x.r===r&&+x.c===c)))||(o==='v'&&(walls.some(x=>x.o==='v'&&+x.c===c&&Math.abs(+x.r-r)===1)||walls.some(x=>x.o==='h'&&+x.r===r&&+x.c===c))))return res.status(409).json({error:'این دیوار با دیوار دیگری تداخل دارد'});
+   const test=[...walls,{o,r,c}];const canReach=(pp)=>{const q=[[+pp.position.r,+pp.position.c]],seen=new Set([q[0].join(',')]);while(q.length){const [a,b]=q.shift();if(pp.goal==='top'?a===0:a===N-1)return true;for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1]]){const x=a+dr,y=b+dc,k=x+','+y;if(x<0||y<0||x>=N||y>=N||blocked(a,b,x,y,test)||seen.has(k))continue;seen.add(k);q.push([x,y]);}}return false;};
+   if(!Object.values(state.players).every(canReach))return res.status(409).json({error:'این دیوار همه مسیرهای رسیدن به هدف را می‌بندد'});
+   cp.walls=Number(cp.walls)-1;state.walls=test;const ix=ordered.indexOf(req.user.id);state.turn=ordered[(ix+1)%ordered.length];state.turnStartedAt=Date.now();
+  }else return res.status(400).json({error:'حرکت نامعتبر است'});
+  db.prepare('UPDATE game_rooms SET state_json=? WHERE id=?').run(JSON.stringify(state),roomId);return res.json({room:gameRoomState(roomId,req.user.id)});
+ }
  if(room.game_type==='classic'){
   if(Number(state.turn)!==req.user.id)return res.status(409).json({error:'هنوز نوبت تو نیست'});
   const cp=state.players?.[String(req.user.id)];
