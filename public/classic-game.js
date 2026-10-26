@@ -36,8 +36,12 @@
     shell(`${topbar('بازی‌ها')}<main class="content classic-games-page">
       <section class="classic-games-hero"><div class="classic-games-logo">${icon('game-classic')}</div><div><span class="classic-update-badge">آپدیت شد</span><h1>بازی‌ها</h1><p>رقابت آنلاین، نوبتی و استراتژیک</p></div></section>
       <section class="classic-game-list">
+        <h2 class="classic-mode-heading">🎲 بازی تصادفی</h2>
         <button class="classic-action-card classic-active" data-classic-start><span class="classic-action-logo">${icon('game-classic')}</span><span><b>کلاسیک</b><small>۱ به ۱ آنلاین · تخته ۹×۹ · ۱۰ دیوار</small></span><em>شروع بازی ←</em></button>
+        ${gameComingSoon('پیشرفته','game-settings')}
+        <h2 class="classic-mode-heading">👥 بازی با دوستان</h2>
         ${gameComingSoon('بازی با دوستان','game-friends')}
+        <h2 class="classic-mode-heading">⚙️ تنظیمات و راهنما</h2>
         ${gameComingSoon('تنظیمات بازی','game-settings')}
         <button class="classic-action-card" data-classic-guide><span class="classic-action-logo">${icon('game-guide')}</span><span><b>راهنما</b><small>قوانین و روش بازی</small></span><em>مشاهده ←</em></button>
       </section>

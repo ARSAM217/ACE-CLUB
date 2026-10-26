@@ -606,3 +606,31 @@ body{background-color:var(--bg);background-repeat:no-repeat;background-size:cove
 .admin-store-pick .admin-cosmetic-art{width:54px;height:54px;font-size:21px}
 .admin-store-pick strong{font-size:11px;line-height:1.4}.admin-store-pick small{font-size:10px;opacity:.8}
 @media(max-width:380px){.admin-store-picker{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* October 26 requested update: post insights, restrictions and level fame clarity */
+.ace-post-insights{max-height:min(82vh,760px);overflow:auto;width:min(94vw,430px)}
+.ace-post-insights .ace-insights-list{display:grid;gap:8px;margin-top:14px}
+.ace-post-insights .userrow{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid rgba(151,100,255,.24);border-radius:14px;background:rgba(25,20,48,.76);color:inherit;text-align:right;width:100%}
+.ace-post-insights .userrow small{display:block;color:var(--muted,#aaa);margin-top:3px}
+.ace-detail-stats>button{border:0;background:transparent;color:inherit;cursor:pointer;padding:6px 8px;border-radius:10px}
+.ace-detail-stats>button:focus-visible,.ace-detail-stats>button:hover{outline:1px solid rgba(180,120,255,.65);background:rgba(130,70,220,.13)}
+.restriction-user{margin:12px 0;border:1px solid rgba(160,110,255,.22)}
+.restriction-user label{display:block;margin-top:10px}
+.restriction-user .row{gap:8px;align-items:center}
+.restriction-user .row .field{min-width:0}
+.edit-profile-avatar .avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.ace-level-mini small{display:block;font-size:.76rem;opacity:.88;margin-top:4px}
+
+/* October 26 requested update: post insights, restrictions and level fame clarity */
+.ace-post-insights{max-height:min(82vh,760px);overflow:auto;width:min(94vw,430px)}
+.ace-post-insights .ace-insights-list{display:grid;gap:8px;margin-top:14px}
+.ace-post-insights .userrow{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid rgba(151,100,255,.24);border-radius:14px;background:rgba(25,20,48,.76);color:inherit;text-align:right;width:100%}
+.ace-post-insights .userrow small{display:block;color:var(--muted,#aaa);margin-top:3px}
+.ace-detail-stats>button{border:0;background:transparent;color:inherit;cursor:pointer;padding:6px 8px;border-radius:10px}
+.ace-detail-stats>button:focus-visible,.ace-detail-stats>button:hover{outline:1px solid rgba(180,120,255,.65);background:rgba(130,70,220,.13)}
+.restriction-user{margin:12px 0;border:1px solid rgba(160,110,255,.22)}
+.restriction-user label{display:block;margin-top:10px}
+.restriction-user .row{gap:8px;align-items:center}
+.restriction-user .row .field{min-width:0}
+.edit-profile-avatar .avatar img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
+.ace-level-mini small{display:block;font-size:.76rem;opacity:.88;margin-top:4px}
