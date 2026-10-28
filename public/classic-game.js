@@ -35,7 +35,7 @@
     return `<button class="ace-game-hub-card ${cls}" data-hub-open="${slug}"><span class="ace-hub-logo"><img src="/assets/ace-ui/game-${slug}.svg" alt="لوگوی ${title}"></span><span class="ace-hub-copy"><b>${title}</b><small>${desc}</small></span><em>${tag} ←</em></button>`;
   }
   window.gamesScreen=async function(){
-    clearTimers();view='games';document.body.classList.remove('namefamile-mode','classic-game-mode');
+    clearTimers();view='games';document.body.classList.remove('namefamile-mode','classic-game-mode','connect-mode');
     shell(`${topbar('بازی‌ها')}<main class="content ace-game-hub-page">
       <section class="ace-game-hub-hero"><img src="/assets/ace-ui/game-hub.svg" alt="لوگوی بازی‌های ACE CLUB"><div><span class="classic-update-badge">مرکز بازی‌ها</span><h1>بازی موردعلاقه‌ات رو انتخاب کن</h1><p>هر بازی بخش اختصاصی، قوانین و رقابت آنلاین خودش را دارد.</p></div></section>
       <section class="ace-game-hub-list">
