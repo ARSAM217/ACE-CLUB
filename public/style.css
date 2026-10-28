@@ -764,3 +764,58 @@ body{background-color:var(--bg);background-repeat:no-repeat;background-size:cove
 .group-message .group-message-menu.iconbtn{width:27px;height:27px;min-width:27px;min-height:27px;padding:0;font-size:16px;line-height:1;border-radius:8px;background:#29232e;color:#c9c3d0;border:1px solid #39313f;box-shadow:none}
 .group-message .group-message-menu.iconbtn:active{background:#403344;color:#fff}
 .group-message .group-message-actions .iconbtn{width:auto;height:29px;min-height:29px;padding:0 10px;border-radius:9px;font-size:11px;background:#27212c;color:#d8d1df}
+
+/* Voice messages temporarily disabled */
+.voice-coming-soon,
+.voice-coming-soon:disabled {
+  display: inline-flex !important;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 48px;
+  height: 44px;
+  padding: 3px 5px;
+  color: #686a73 !important;
+  background: #17181d !important;
+  border: 1px solid #292b32 !important;
+  box-shadow: none !important;
+  opacity: 0.8 !important;
+  filter: grayscale(1);
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.voice-coming-soon span {
+  font-size: 17px;
+  line-height: 19px;
+}
+
+.voice-coming-soon small {
+  font-size: 8px;
+  line-height: 10px;
+  color: #777984 !important;
+}
+
+.voice-disabled-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 13px;
+  border: 1px solid #292b32;
+  border-radius: 12px;
+  background: #17181d;
+  color: #777984;
+  filter: grayscale(1);
+}
+
+.voice-disabled-note span {
+  opacity: .65;
+}
+
+.voice-disabled-note small {
+  color: #777984;
+  font-size: 11px;
+}
