@@ -39,14 +39,12 @@
     shell(`${topbar('بازی‌ها')}<main class="content ace-game-hub-page">
       <section class="ace-game-hub-hero"><img src="/assets/ace-ui/game-hub.svg" alt="لوگوی بازی‌های ACE CLUB"><div><span class="classic-update-badge">مرکز بازی‌ها</span><h1>بازی موردعلاقه‌ات رو انتخاب کن</h1><p>هر بازی بخش اختصاصی، قوانین و رقابت آنلاین خودش را دارد.</p></div></section>
       <section class="ace-game-hub-list">
-        <button class="classic-action-card classic-active" data-live-games><span class="classic-action-logo">📡</span><span><b>پخش زنده بازی‌ها</b><small>فقط تماشا؛ ورود به بازی فعال بدون امکان دخالت</small></span><em>مشاهده بازی‌ها ←</em></button>
         ${gameHubCard('namefamile','اسم‌فامیل','رقابت کلمه‌ای آنلاین · ۲ تا ۸ بازیکن · جایزه ویژه','ورود به بازی','ace-hub-namefamile')}
         ${gameHubCard('koodiro','کودیرو','تمام بازی‌های تخته‌ای و رقابتی کودیرو در یک بخش','مشاهده بازی‌ها','ace-hub-koodiro')}
         ${gameHubCard('connect','کانکت','یک بازیکن در برابر همه · حدس کلمه · ۳ تا ۱۴ نفر','شروع سریع','ace-hub-connect')}
       </section>
       <div class="ace-hub-note"><img src="/assets/ace-ui/game-safe.svg" alt=""><span>پیشرفت و جوایز بازی‌ها به حساب ACE CLUB متصل می‌ماند.</span></div>
     </main>`);
-    document.querySelector('[data-live-games]')?.addEventListener('click',()=>window.liveGamesScreen?.());
     document.querySelectorAll('[data-hub-open]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.hubOpen==='namefamile')return window.nameFamileScreen?.();if(btn.dataset.hubOpen==='koodiro')return window.koodiroGamesScreen?.();if(btn.dataset.hubOpen==='connect')return window.connectGameScreen?.();if(btn.dataset.hubOpen==='connect')return window.connectGameScreen?.()}));
   };
   window.koodiroGamesScreen=async function(){
