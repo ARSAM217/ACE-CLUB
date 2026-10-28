@@ -31,27 +31,55 @@
     document.body.append(layer);
   }
   function gameComingSoon(title,iconName){return `<button class="classic-action-card classic-disabled" type="button" disabled>${icon(iconName)}<span><b>${title}</b><small>آپدیت به‌زودی</small></span><em>به‌زودی</em></button>`}
+  function gameHubCard(slug,title,desc,tag,cls=''){
+    return `<button class="ace-game-hub-card ${cls}" data-hub-open="${slug}"><span class="ace-hub-logo"><img src="/assets/ace-ui/game-${slug}.svg" alt="لوگوی ${title}"></span><span class="ace-hub-copy"><b>${title}</b><small>${desc}</small></span><em>${tag} ←</em></button>`;
+  }
   window.gamesScreen=async function(){
-    clearTimers();view='games';
-    shell(`${topbar('بازی‌ها')}<main class="content classic-games-page">
-      <section class="classic-games-hero"><div class="classic-games-logo">${icon('game-classic')}</div><div><span class="classic-update-badge">آپدیت شد</span><h1>بازی‌ها</h1><p>رقابت آنلاین، نوبتی و استراتژیک</p></div></section>
-      <section class="classic-game-list">
-        <h2 class="classic-mode-heading">🎲 بازی تصادفی</h2>
-        <button class="classic-action-card classic-active" data-classic-start><span class="classic-action-logo">${icon('game-classic')}</span><span><b>کلاسیک</b><small>۱ به ۱ آنلاین · تخته ۹×۹ · ۱۰ دیوار</small></span><em>شروع بازی ←</em></button>
-        <button class="classic-action-card classic-active" data-advanced-start><span class="classic-action-logo">${icon('game-settings')}</span><span><b>پیشرفته ۲ به ۲</b><small>۴ نفره · تخته ۱۲×۱۲ · ۲۰ دیوار مشترک · تا ۳ برد دست؛ شروع دوباره بعد از هر دست</small></span><em>شروع بازی ←</em></button>
-        <h2 class="classic-mode-heading">👥 بازی با دوستان</h2>
-        ${gameComingSoon('بازی با دوستان','game-friends')}
-        <h2 class="classic-mode-heading">⚙️ تنظیمات و راهنما</h2>
-        ${gameComingSoon('تنظیمات بازی','game-settings')}
-        <button class="classic-action-card" data-classic-guide><span class="classic-action-logo">${icon('game-guide')}</span><span><b>راهنما</b><small>قوانین و روش بازی</small></span><em>مشاهده ←</em></button>
+    clearTimers();view='games';document.body.classList.remove('namefamile-mode','classic-game-mode');
+    shell(`${topbar('بازی‌ها')}<main class="content ace-game-hub-page">
+      <section class="ace-game-hub-hero"><img src="/assets/ace-ui/game-hub.svg" alt="لوگوی بازی‌های ACE CLUB"><div><span class="classic-update-badge">مرکز بازی‌ها</span><h1>بازی موردعلاقه‌ات رو انتخاب کن</h1><p>هر بازی بخش اختصاصی، قوانین و رقابت آنلاین خودش را دارد.</p></div></section>
+      <section class="ace-game-hub-list">
+        <button class="classic-action-card classic-active" data-live-games><span class="classic-action-logo">📡</span><span><b>پخش زنده بازی‌ها</b><small>فقط تماشا؛ ورود به بازی فعال بدون امکان دخالت</small></span><em>مشاهده بازی‌ها ←</em></button>
+        ${gameHubCard('namefamile','اسم‌فامیل','رقابت کلمه‌ای آنلاین · ۲ تا ۸ بازیکن · جایزه ویژه','ورود به بازی','ace-hub-namefamile')}
+        ${gameHubCard('koodiro','کودیرو','تمام بازی‌های تخته‌ای و رقابتی کودیرو در یک بخش','مشاهده بازی‌ها','ace-hub-koodiro')}
+        ${gameHubCard('connect','کانکت','یک بازیکن در برابر همه · حدس کلمه · ۳ تا ۱۴ نفر','شروع سریع','ace-hub-connect')}
       </section>
-
+      <div class="ace-hub-note"><img src="/assets/ace-ui/game-safe.svg" alt=""><span>پیشرفت و جوایز بازی‌ها به حساب ACE CLUB متصل می‌ماند.</span></div>
+    </main>`);
+    document.querySelector('[data-live-games]')?.addEventListener('click',()=>window.liveGamesScreen?.());
+    document.querySelectorAll('[data-hub-open]').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.hubOpen==='namefamile')return window.nameFamileScreen?.();if(btn.dataset.hubOpen==='koodiro')return window.koodiroGamesScreen?.();if(btn.dataset.hubOpen==='connect')return window.connectGameScreen?.();if(btn.dataset.hubOpen==='connect')return window.connectGameScreen?.()}));
+  };
+  window.koodiroGamesScreen=async function(){
+    clearTimers();view='games';document.body.classList.remove('namefamile-mode');
+    shell(`${topbar('کودیرو')}<main class="content ace-koodiro-page">
+      <section class="ace-game-hub-hero koodiro-hero"><img src="/assets/ace-ui/game-koodiro.svg" alt="لوگوی اختصاصی کودیرو"><div><span class="classic-update-badge">بخش کودیرو</span><h1>بازی‌های کودیرو</h1><p>بازی‌های تخته‌ای و رقابت‌های چندنفره را از اینجا انتخاب کن.</p></div></section>
+      <section class="classic-game-list">
+        <h2 class="classic-mode-heading">♟️ بازی‌های کودیرو</h2>
+        <button class="classic-action-card classic-active" data-classic-start><span class="classic-action-logo"><img src="/assets/ace-ui/game-classic.svg" alt="لوگوی بازی کلاسیک"></span><span><b>کودیرو کلاسیک</b><small>۱ به ۱ آنلاین · تخته ۹×۹ · ۱۰ دیوار</small></span><em>شروع بازی ←</em></button>
+        <button class="classic-action-card classic-active" data-advanced-start><span class="classic-action-logo"><img src="/assets/ace-ui/game-advanced.svg" alt="لوگوی بازی پیشرفته"></span><span><b>کودیرو پیشرفته</b><small>۴ نفره · تخته ۱۲×۱۲ · ۲۰ دیوار مشترک · تا ۳ برد دست</small></span><em>شروع بازی ←</em></button>
+        <button class="classic-action-card" data-classic-guide><span class="classic-action-logo"><img src="/assets/ace-ui/game-guide.svg" alt="لوگوی راهنما"></span><span><b>راهنمای کودیرو</b><small>قوانین و روش بازی</small></span><em>مشاهده ←</em></button>
+        <button class="classic-action-card" data-koodiro-back><span class="classic-action-logo"><img src="/assets/ace-ui/game-back.svg" alt="بازگشت"></span><span><b>بازگشت به انتخاب بازی</b><small>اسم‌فامیل یا کودیرو</small></span><em>بازگشت ←</em></button>
+      </section>
     </main>`);
     $('[data-classic-start]')?.addEventListener('click',async()=>{try{const d=await api('/games/join',{method:'POST',body:{gameType:'classic'}});window.activeGameRoom=d.room.id;viewStack.push('games');view='gameRoom';await classicGameRoomScreen(d.room.id)}catch(err){toast(err.message)}});
     $('[data-advanced-start]')?.addEventListener('click',async()=>{try{const d=await api('/games/join',{method:'POST',body:{gameType:'advanced'}});window.activeGameRoom=d.room.id;viewStack.push('games');view='gameRoom';await classicGameRoomScreen(d.room.id)}catch(err){toast(err.message)}});
     $('[data-classic-guide]')?.addEventListener('click',gameGuide);
-    document.querySelectorAll('[data-classic-coming]').forEach(btn=>btn.addEventListener('click',()=>gameSettings()));
-    
+    $('[data-koodiro-back]')?.addEventListener('click',()=>gamesScreen());
+  };
+  window.liveGamesScreen=async function(){
+    if(window.aceLiveSpectatorTimer){clearInterval(window.aceLiveSpectatorTimer);window.aceLiveSpectatorTimer=null;}
+    const draw=async()=>{const d=await api('/games/live');const names={connect:'کانکت',namefamile:'اسم‌فامیل',koodiro:'کودیرو'};
+      shell(`${topbar('پخش زنده بازی‌ها')}<main class="content"><button class="btn secondary" data-live-back>← بازگشت به بازی‌ها</button><div class="card"><h2>📡 بازی‌های در حال اجرا</h2><p class="muted small">تماشاگر فقط وضعیت و جریان مجاز بازی را می‌بیند؛ نمی‌تواند حرکت کند، پاسخ ثبت کند یا روی نتیجه اثر بگذارد.</p><div class="admin-game-filters"><input id="liveGameSearch" class="field" placeholder="جستجوی نام بازی…"><select id="liveGameType" class="field"><option value="">همه بازی‌ها</option><option value="connect">کانکت</option><option value="namefamile">اسم‌فامیل</option><option value="koodiro">کودیرو</option></select></div><div id="liveGameList">${(d.games||[]).map(g=>`<div class="adminrow live-game-row" data-kind="${esc(g.kind)}" data-name="${esc(g.gameName)}"><div class="grow"><b>🔴 ${esc(g.gameName)} · #${g.id}</b><div class="muted small">${esc(g.status)} · ${fa(g.players)} بازیکن · ${esc(g.createdAt||'')}</div></div><button class="btn" data-watch-kind="${esc(g.kind)}" data-watch-id="${g.id}">تماشای زنده</button></div>`).join('')||'<div class="empty">الان بازی عمومیِ در حال اجرا پیدا نشد. این صفحه را بعداً دوباره باز کن.</div>'}</div></div></main>`);
+      $('#liveGameSearch').oninput=filter;$('#liveGameType').onchange=filter;function filter(){const q=$('#liveGameSearch').value.trim().toLowerCase(),type=$('#liveGameType').value;document.querySelectorAll('.live-game-row').forEach(r=>r.style.display=(!q||r.dataset.name.toLowerCase().includes(q))&&(!type||r.dataset.kind===type)?'':'none')}
+      $('[data-live-back]')?.addEventListener('click',()=>{clearInterval(window.aceLiveSpectatorTimer);window.aceLiveSpectatorTimer=null;gamesScreen()});document.querySelectorAll('[data-watch-kind]').forEach(b=>b.onclick=()=>window.watchLiveGame?.(b.dataset.watchKind,Number(b.dataset.watchId)));
+    };try{await draw();window.aceLiveSpectatorTimer=setInterval(()=>{if(view==='games')draw().catch(()=>{})},5000)}catch(err){toast(err.message)}
+  };
+  window.watchLiveGame=async function(kind,id){if(window.aceLiveSpectatorTimer){clearInterval(window.aceLiveSpectatorTimer);window.aceLiveSpectatorTimer=null;}let stopped=false;const draw=async()=>{if(stopped)return;const d=await api(`/games/live/${encodeURIComponent(kind)}/${id}`),g=d.game;let body='';
+      if(kind==='connect'){body=`<p><b>مرحله:</b> ${esc(g.status==='word'?'انتخاب کلمه':g.status==='playing'?'در حال اجرا':'پایان‌یافته')}</p><p><b>حروف آشکارشده:</b> ${esc(g.prefix||'هنوز انتخاب نشده')} · طول کلمه: ${fa(g.secretLength||0)}</p><p><b>راهنمای فعلی:</b> ${esc(g.clue||'در حال آماده‌سازی راهنما')}</p><p class="muted small">کلمه مخفی و کلمه راهنمای قابل حدس عمداً به تماشاگر نشان داده نمی‌شود تا تقلب ممکن نباشد.</p>`;}
+      else if(kind==='namefamile'){body=`<p><b>دور:</b> ${fa(g.roundNo||0)} از ${fa(g.roundsTotal||5)} · <b>حرف:</b> ${esc(g.letter||'—')}</p><p><b>دسته‌ها:</b> ${(g.categories||[]).map(c=>esc(c.label||c.id)).join('، ')||'در انتظار شروع دور'}</p>${g.answers?`<h3>پاسخ‌های ثبت‌شده (دور بررسی/پایان)</h3>${g.answers.map(a=>`<div class="adminrow"><div class="grow"><b>${esc(a.name)}</b><div class="muted small">${Object.entries(a.answers||{}).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join(' · ')}</div></div></div>`).join('')}`:'<p class="muted small">پاسخ‌های بازیکنان تا مرحله بررسی/پایان مخفی هستند.</p>'}`;}
+      else{const st=g.state||{};body=`<p><b>نوع:</b> ${esc(g.gameType==='advanced'?'پیشرفته':'کلاسیک')}</p><p class="muted small">نمایش وضعیت تخته و بازیکنان؛ کنترل‌های بازی برای تماشاگر غیرفعال است.</p><pre class="live-game-state">${esc(JSON.stringify(st,null,2).slice(0,7000))}</pre>`;}
+      shell(`${topbar('تماشای زنده · '+(kind==='connect'?'کانکت':kind==='namefamile'?'اسم‌فامیل':'کودیرو'))}<main class="content"><button class="btn secondary" data-watch-back>← فهرست بازی‌ها</button><div class="card"><div class="classic-update-badge">🔴 تماشاگر · فقط مشاهده</div><h2>${esc(kind==='connect'?'کانکت':kind==='namefamile'?'اسم‌فامیل':'کودیرو')} #${id}</h2><div class="adminrow"><div class="grow"><b>بازیکنان</b><div class="muted small">${(g.players||[]).map(p=>esc(p.name||p.display_name||'بازیکن')).join('، ')||'—'}</div></div><span class="pill">${esc(g.status||'')}</span></div>${body}<button class="btn block" data-watch-back>بازگشت به فهرست بازی‌ها</button></div></main>`);
+      document.querySelectorAll('[data-watch-back]').forEach(b=>b.onclick=()=>{stopped=true;window.liveGamesScreen?.()});};try{await draw();window.aceLiveSpectatorTimer=setInterval(()=>{if(view==='games')draw().catch(()=>{})},2000)}catch(err){toast(err.message);window.liveGamesScreen?.()}
   };
   function playersMap(room){return room.players||[]}
   function stateOf(room){return room.state||{}}
