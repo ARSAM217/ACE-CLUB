@@ -819,3 +819,10 @@ body{background-color:var(--bg);background-repeat:no-repeat;background-size:cove
   color: #777984;
   font-size: 11px;
 }
+
+/* ACE CLUB chat unread badges: compact, RTL-safe and mobile-friendly */
+.ace-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#f0445e;color:#fff;font-size:10px;font-weight:800;line-height:1;white-space:nowrap;vertical-align:middle;box-shadow:0 2px 8px #f0445e35;font-style:normal}
+.ace-bottomnav .nav-icon{position:relative;overflow:visible}
+.ace-bottomnav [data-nav-unread]{position:absolute;top:-7px;right:-9px;z-index:3;line-height:0}
+.ace-bottomnav .nav-icon .ace-unread-badge{border:2px solid #101117;min-width:17px;height:17px;font-size:9px}
+.chat-list-row strong .ace-unread-badge{margin-inline-start:5px}
