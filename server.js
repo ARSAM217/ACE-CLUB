@@ -1615,8 +1615,8 @@ const challengeCatalog=[
  {id:'weekwins',category:'چالش‌های هفتگی',title:'بردن ۱۰ بازی در هفته',scope:'weekly',metric:'winsWeek',target:10,coins:1600,fame:500},
  {id:'level5',category:'سطح و افتخار',title:'رسیدن به سطح ۵',scope:'permanent',metric:'level',target:5,coins:400,fame:100},
  {id:'level10',category:'سطح و افتخار',title:'رسیدن به سطح ۱۰',scope:'permanent',metric:'level',target:10,coins:1000,fame:300},
- {id:'games100',category:'سطح و افتخار',title:'انجام ۱۰۰ بازی',scope:'permanent',metric:'playsAll',target:100,coins:1000,fame:300},
- {id:'games500',category:'سطح و افتخار',title:'انجام ۵۰۰ بازی',scope:'permanent',metric:'playsAll',target:500,coins:5000,fame:1500},
+ {id:'games100',category:'سطح و افتخار',title:'انجام ۱۰۰ بازی',scope:'permanent',metric:'playsAll',target:100,coins:1000,fame:10000},
+ {id:'games500',category:'سطح و افتخار',title:'انجام ۵۰۰ بازی',scope:'permanent',metric:'playsAll',target:500,coins:5000,fame:100000},
  {id:'coins1000',category:'سطح و افتخار',title:'جمع‌آوری ۱٬۰۰۰ سکه',scope:'permanent',metric:'coinsEarned',target:1000,coins:300,fame:100},
  {id:'missions10',category:'سطح و افتخار',title:'تکمیل ۱۰ مأموریت',scope:'permanent',metric:'missions',target:10,coins:1000,fame:300}
 ];
