@@ -845,3 +845,21 @@ body{background-color:var(--bg);background-repeat:no-repeat;background-size:cove
 .avatar-frame-violet{box-shadow:0 0 0 3px #9b5cff,0 0 12px #9b5cff88}.avatar-frame-sunset{box-shadow:0 0 0 3px #ff7e5f,0 0 12px #ff7e5f88}.avatar-frame-royal{box-shadow:0 0 0 3px #4657d8,0 0 12px #4657d888}.avatar-frame-chrome{box-shadow:0 0 0 3px #c8d0dc,0 0 12px #c8d0dc88}.avatar-frame-opal{box-shadow:0 0 0 3px #80d9d0,0 0 12px #80d9d088}
 .cosmetic-violet{--cosmetic-accent:#9b5cff}.cosmetic-sunset{--cosmetic-accent:#ff7e5f}.cosmetic-royal{--cosmetic-accent:#4657d8}.cosmetic-chrome{--cosmetic-accent:#c8d0dc}.cosmetic-opal{--cosmetic-accent:#80d9d0}
 .ace-cosmetic-item .ace-cosmetic-preview{border-color:var(--cosmetic-accent,currentColor)}
+
+/* CONNECT match controls: prevent accidental navigation while a live match is running. */
+.connect-mode.connect-in-match .bottomnav{display:none!important}
+.connect-mode.connect-in-match .topbar .back-btn{display:none!important}
+.connect-play-head{flex-wrap:wrap}
+.connect-leave-button{flex:none;border:1px solid #ff6b7c88;border-radius:11px;background:#3b1724;color:#ffd5dc;font-size:11px;font-weight:900;padding:9px 12px;min-height:38px}
+.connect-leave-button:disabled{opacity:.5}
+
+/* Private chat composer: keep every control visible above the Android keyboard/safe area. */
+.chat-layout{min-height:0;height:100dvh;height:100svh;overflow:hidden}
+.chat-head{flex:none;min-height:62px}
+.messages{min-height:0;overscroll-behavior:contain}
+.chat-compose{flex:none;position:relative;z-index:25;display:flex!important;align-items:flex-end;gap:7px;min-height:62px;padding:9px 10px calc(9px + env(safe-area-inset-bottom));box-sizing:border-box}
+.chat-compose>label.iconbtn{display:grid!important;place-items:center;flex:0 0 40px;min-width:40px;min-height:40px;color:#e8eaf2;font-size:25px;line-height:1}
+.chat-compose>textarea#messageText{display:block!important;flex:1 1 auto;min-width:0;width:0;min-height:42px;max-height:110px;margin:0;padding:10px 13px!important;line-height:1.6;resize:none;visibility:visible!important;opacity:1!important}
+.chat-compose>.voice-coming-soon{display:inline-flex!important;flex:0 0 48px;min-width:48px;min-height:44px}
+.chat-compose>button[type=submit]{flex:0 0 42px;min-width:42px;min-height:42px}
+@media(max-width:420px){.chat-compose{gap:5px;padding-left:7px;padding-right:7px}.chat-compose>label.iconbtn{flex-basis:36px;min-width:36px;width:36px}.chat-compose>.voice-coming-soon{flex-basis:44px;min-width:44px;width:44px}.chat-compose>button[type=submit]{flex-basis:38px;min-width:38px;width:38px}}
